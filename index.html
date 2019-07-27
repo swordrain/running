@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+
+<body>
+    <canvas id="canvas" width="600" height="400" style="border:1px solid saddlebrown"></canvas>
+    <script>
+        class Position {
+            constructor(x, y) {
+                this.x = x
+                this.y = y
+            }
+        }
+        const canvas = document.getElementById('canvas')
+        const context = canvas.getContext('2d')
+        const image = new Image()
+        image.src = 'walking.jpeg'
+        let index = 0 //计数，每次渲染时+1
+        const HSTEP = 70 //横向每帧间隔距离
+        const VSTEP = 92 //纵向每帧间隔距离
+        const MOVESTEP = 10 //每帧移动距离
+        const TIMESTAMP_THRESHOLD = 80 // 时差阈值
+        const FRAMES_LENGTH = 8
+        let lastTime = 0 //记录上次时间戳
+        let currentPos = new Position(0, 0) //当前位置
+        let targetPos = new Position(0, 0) //目标位置
+        let angle = 0
+        let movingAngleType = 2 //角度类型一共8种
+        let xMoveStep //x轴每次移动距离
+        let yMoveStep //y轴每次移动距离
+        image.onload = () => {
+            window.requestAnimationFrame(walking) //启动动画
+        }
+        function windowToCanvas(canvas, x, y) {
+            var bbox = canvas.getBoundingClientRect();
+            var style = window.getComputedStyle(canvas);
+            return {
+                x: (x - bbox.left - parseInt(style.paddingLeft) - parseInt(style.borderLeft))
+                    * (canvas.width / parseInt(style.width)),
+                y: (y - bbox.top - parseInt(style.paddingTop) - parseInt(style.borderTop))
+                    * (canvas.height / parseInt(style.height))
+            };
+        }
+        function walking(timestamp) { //抽象成:在什么位置，画什么图，完全由状态数据决定 UI = f(state)
+            if (timestamp - lastTime > TIMESTAMP_THRESHOLD) { //满时差后渲染
+                lastTime = timestamp
+                //计算步进，MOVESTEP要投射到x轴和y轴上
+                // 这里xMoveStep没取绝对值，调试了好久
+                if (Math.abs(targetPos.x - currentPos.x) > Math.abs(xMoveStep)) { 
+                    currentPos.x += xMoveStep
+                } else {
+                    currentPos.x = targetPos.x
+                }
+                
+                if (Math.abs(targetPos.y - currentPos.y) > Math.abs(yMoveStep)) {
+                    currentPos.y += yMoveStep
+                } else {
+                    currentPos.y = targetPos.y
+                }
+
+                context.clearRect(0, 0, canvas.width, canvas.height)
+                context.drawImage(image, HSTEP * (index++ % FRAMES_LENGTH), VSTEP * movingAngleType,
+                    HSTEP, VSTEP, currentPos.x, currentPos.y, HSTEP, VSTEP)
+            }
+            window.requestAnimationFrame(walking)
+        }
+
+        canvas.addEventListener('click', e => {
+            const position = windowToCanvas(canvas, e.clientX, e.clientY)
+            targetPos.x = position.x - HSTEP / 2 //鼠标点击点为人物的中心，所以减去一半宽度
+            targetPos.y = position.y - VSTEP / 2 //鼠标点击点为人物的中心，所以减去一半高度
+            //计算angle
+            angle = Math.asin((targetPos.y - currentPos.y) / Math.sqrt(Math.pow(targetPos.y - currentPos.y, 2)
+                + Math.pow(targetPos.x - currentPos.x, 2)))
+            if (targetPos.x < currentPos.x) {
+                angle = Math.PI - angle
+            }
+            xMoveStep = MOVESTEP * Math.cos(angle) //只用计算一次
+            yMoveStep = MOVESTEP * Math.sin(angle) 
+            //判断哪种角度的奔跑
+            if(angle >-5 * Math.PI /12 && angle < -Math.PI /12) {
+                movingAngleType = 7 //右上
+            } else if(angle >= -Math.PI / 12 && angle <= Math.PI / 12 ) {
+                movingAngleType = 2 //右
+            } else if(angle > Math.PI /12 && angle < 5 * Math.PI / 12) {
+                movingAngleType = 5 //右下
+            } else if(angle >= 5 * Math.PI /12 && angle <= 7 * Math.PI /12) {
+                movingAngleType = 0 //下
+            } else if(angle > 7 * Math.PI /12 && angle  < 11 * Math.PI /12) {
+                movingAngleType = 4 //左下
+            } else if(angle >= 11 * Math.PI /12 && angle <= 13 * Math.PI /12) {
+                movingAngleType = 1 //左
+            } else if(angle > 13 * Math.PI /12 && angle < 17 * Math.PI /12) {
+                movingAngleType = 6 //左上
+            } else {
+                movingAngleType = 3 //上
+            }
+        })
+    </script>
+</body>
+
+</html>
